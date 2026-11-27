@@ -12,8 +12,9 @@ def pattern(cfg: dict) -> re.Pattern:
 
 
 def work_item_from_branch(name: str, cfg: dict) -> str | None:
+    """Work item ID from a branch name, normalised to upper case (feature/ai-204-x → AI-204)."""
     m = re.match(rf"^[^/]+/({cfg['work_item_pattern']})-", name)
-    return m.group(1) if m else None
+    return m.group(1).upper() if m else None
 
 
 def check(name: str, cfg: dict) -> Result:
@@ -28,6 +29,7 @@ def check(name: str, cfg: dict) -> Result:
         types = "|".join(cfg["branches"]["work_types"])
         r.error(
             f"'{name}' does not match ({types})/<work-item>-<slug>, "
-            "e.g. feature/1234-target-plans. Use lowercase words joined by hyphens for the slug."
+            "e.g. feature/1234-target-plans or feature/ai-204-vision-builder. "
+            "Use lowercase words joined by hyphens for the slug."
         )
     return r

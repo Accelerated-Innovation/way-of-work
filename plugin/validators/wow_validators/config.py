@@ -20,8 +20,9 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
 CONFIG_FILE = ".wow.toml"
 
 DEFAULTS: dict = {
-    # Work item IDs: numeric (1234) or tracker keys (WOW-1234). See Way of Work §14 Q3.
-    "work_item_pattern": r"(?:\d+|[A-Z][A-Z0-9]+-\d+)",
+    # Work item IDs: numeric (1234) or tracker keys (AI-204). Keys are matched in any case,
+    # because branch names are lowercase (feature/ai-204-vision). See Way of Work §14 Q3.
+    "work_item_pattern": r"(?:\d+|[A-Za-z][A-Za-z0-9]+-\d+)",
     # Optional: link template used by skills, e.g. "https://example.atlassian.net/browse/{id}"
     "work_item_url": "",
     "branches": {
@@ -90,6 +91,10 @@ DEFAULTS: dict = {
             "**/.env.example", "**/.env.sample", "**/.env.template", "**/.env.dist",
             "**/*.example.*", "**/*.sample.*", "**/*.template.*", "**/*.pub",
         ],
+    },
+    "docs": {
+        # Where architecture decision records live. Auto-detected when empty.
+        "adr_path": "",
     },
     "manifests": {
         "paths": [],  # e.g. ["deploy/**/*.yaml", "charts/**/templates/*.yaml"]

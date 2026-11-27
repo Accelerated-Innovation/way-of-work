@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wow-validators"
-version = "0.1.0"
+version = "0.1.1"
 description = "Accelerated Innovation Way of Work validators"
 requires-python = ">=3.11"
 dependencies = []

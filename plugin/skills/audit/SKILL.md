@@ -39,7 +39,22 @@ A short table: area · status (✅/⚠️/❌) · what to do. Then the repo's ro
 `| <repo> | Rulesets ☐/☑ | Environments ☐/☑ | PR check ☐/☑ | Auto-deploy develop ☐/☑ | Auto-deploy staging ☐/☑ |`
 (auto-deploy: look for workflows triggered on push to develop/staging that deploy.)
 
-## 4. Fix (only with the user's go-ahead, on a work branch via `/wow:start`)
+## 4. Fix — in this order (each step only with the user's go-ahead)
+
+### 4a. Bootstrap the branch model (if `develop` doesn't exist)
+A repository that only has `main` can't take a work branch or a PR into `develop` yet, so this comes first. Needs repo admin. Create the branches on GitHub from the current default branch (API calls, not `git push`, so nothing is pushed straight to a protected branch):
+```bash
+R=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+DEFAULT=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+SHA=$(gh api repos/$R/git/ref/heads/$DEFAULT --jq .object.sha)
+for B in develop staging demo prod; do
+  gh api repos/$R/git/refs -f ref=refs/heads/$B -f sha=$SHA
+done
+gh api -X PATCH repos/$R -f default_branch=develop -F delete_branch_on_merge=true
+```
+Ask what happens to the old default (`main`): usually keep it read-only for a while, then delete it once nothing references it. Open work branches (e.g. one based on `main`) should be rebased or merged onto `develop` and their PRs retargeted (`gh pr edit <n> --base develop`).
+
+### 4b. Repository files (on a work branch via `/wow:start`, PR into `develop`)
 Copy from `TEMPLATES`, adapting to the repo:
 - `.github/workflows/wow.yml` and `.github/workflows/wow-release.yml` (caller workflows)
 - `.github/pull_request_template.md`
@@ -47,7 +62,12 @@ Copy from `TEMPLATES`, adapting to the repo:
 - `.pre-commit-config.yaml` (secret scan + commit message checks for people not using Claude)
 - `.gitignore` additions from `gitignore-secrets.txt`; `.env.example` with placeholders only
 - `CODEOWNERS` for high-risk paths
-- README sections that are missing (what it is, run locally, test, deploy); `docs/adr/0001-record-architecture-decisions.md`
+- README sections that are missing (what it is, run locally, test, deploy); if there is no ADR folder, `docs/adr/0001-record-architecture-decisions.md` (if ADRs live somewhere unusual, set `[docs] adr_path`)
 
-GitHub settings: `TEMPLATES/rulesets/*.json` can be imported (Settings → Rules → Rulesets → Import) or applied with
-`gh api -X POST repos/$R/rulesets --input <file>` after replacing the lead team ID placeholder (`gh api orgs/<org>/teams/<slug> --jq .id`). Changing settings needs admin rights: show the user the exact commands and run them only when they confirm. Org-level items (push protection enforcement, delegated bypass, custom secret patterns) are in `docs/github-setup.md` in the way-of-work repo; point the user to an org admin for those.
+### 4c. GitHub settings
+Once the 4b PR has run its checks at least once (a required check that has never run blocks every PR):
+`TEMPLATES/rulesets/*.json` can be imported (Settings → Rules → Rulesets → Import) or applied with
+`gh api -X POST repos/$R/rulesets --input <file>` after replacing the lead team ID placeholder (`gh api orgs/<org>/teams/<slug> --jq .id`). Then create the `prod` environment with the named approver (Settings → Environments, or `gh api -X PUT repos/$R/environments/prod` with `reviewers`). Changing settings needs admin rights: show the user the exact commands and run them only when they confirm.
+
+### 4d. Org admin
+Org-level items (push protection enforcement, delegated bypass, custom secret patterns) are in `docs/github-setup.md` in the way-of-work repo; point the user to an org admin for those.

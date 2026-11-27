@@ -86,7 +86,8 @@ class TestGlob(unittest.TestCase):
 
 class TestBranch(unittest.TestCase):
     def test_valid(self):
-        for name in ["feature/1234-target-plans", "fix/WOW-12-login-loop", "hotfix/88-null-tenant"]:
+        for name in ["feature/1234-target-plans", "fix/WOW-12-login-loop", "hotfix/88-null-tenant",
+                     "feature/ai-204-vision-builder"]:
             self.assertTrue(branch.check(name, CFG).ok, name)
 
     def test_invalid(self):
@@ -100,6 +101,8 @@ class TestBranch(unittest.TestCase):
 
     def test_work_item(self):
         self.assertEqual(branch.work_item_from_branch("feature/WOW-12-x", CFG), "WOW-12")
+        self.assertEqual(branch.work_item_from_branch("feature/ai-204-vision-builder", CFG), "AI-204")
+        self.assertEqual(branch.work_item_from_branch("fix/1234-login", CFG), "1234")
 
 
 class TestCommits(unittest.TestCase):
@@ -304,6 +307,24 @@ class TestFiles(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAdrDetection(unittest.TestCase):
+    def test_finds_nested_and_configured(self):
+        from wow_validators import audit
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self.assertIsNone(audit.find_adr_dir(root, CFG))
+            adr = root / "docs/backend/architecture/ADR"
+            adr.mkdir(parents=True)
+            self.assertIsNone(audit.find_adr_dir(root, CFG))  # empty folder doesn't count
+            (adr / "0001-use-fastapi.md").write_text("# 1")
+            self.assertEqual(audit.find_adr_dir(root, CFG), "docs/backend/architecture/ADR")
+            (root / "node_modules/x/adr").mkdir(parents=True)
+            (root / "node_modules/x/adr/a.md").write_text("x")
+            self.assertEqual(audit.find_adr_dir(root, CFG), "docs/backend/architecture/ADR")
+            cfg = config._merge(CFG, {"docs": {"adr_path": "decisions"}})
+            self.assertIsNone(audit.find_adr_dir(root, cfg))
 
 
 class TestRepoConsistency(unittest.TestCase):
