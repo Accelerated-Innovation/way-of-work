@@ -7,7 +7,7 @@
       "name": "wow",
       "source": "./plugin",
       "description": "Way of Work: branch, commit, PR, review and release to the team standard, with secret guardrails.",
-      "version": "0.1.0"
+      "version": "0.1.1"
     }
   ]
 }

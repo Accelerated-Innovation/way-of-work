@@ -12,11 +12,36 @@ from pathlib import Path
 from .checks import manifests, secrets, version
 from .util import Result, git
 
+ADR_DIR_NAMES = {"adr", "adrs", "decisions", "decision-records", "architecture-decisions"}
+SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", "bin", "obj", "__pycache__", ".wow"}
+
 
 def _exists_any(root: Path, names: list[str]) -> str | None:
     for n in names:
         if (root / n).exists():
             return n
+    return None
+
+
+def find_adr_dir(root: Path, cfg: dict, max_depth: int = 5) -> str | None:
+    """Configured [docs] adr_path, else the first folder named adr/ADR/decisions/… that holds .md files."""
+    configured = cfg.get("docs", {}).get("adr_path", "")
+    if configured:
+        return configured if (root / configured).is_dir() else None
+    stack = [(root, 0)]
+    while stack:
+        d, depth = stack.pop()
+        try:
+            children = sorted((c for c in d.iterdir() if c.is_dir()), reverse=True)
+        except OSError:
+            continue
+        for c in children:
+            if c.name in SKIP_DIRS:
+                continue
+            if c.name.lower() in ADR_DIR_NAMES and any(c.glob("*.md")):
+                return str(c.relative_to(root)).replace("\\", "/")
+            if depth + 1 < max_depth:
+                stack.append((c, depth + 1))
     return None
 
 
@@ -72,7 +97,13 @@ def run(root_str: str, cfg: dict, history: bool = False) -> list[Result]:
         }.items():
             if not any(w in text for w in words):
                 r.warn(f"README does not seem to cover {topic}.")
-    if not _exists_any(root, ["docs/adr", "docs/adrs", "adr", "docs/decisions", "doc/adr"]):
-        r.warn("No ADR folder (e.g. docs/adr). Record architecture decisions in the repository.")
+    adr = find_adr_dir(root, cfg)
+    if adr:
+        r.note(f"ADRs: {adr}")
+    elif cfg.get("docs", {}).get("adr_path"):
+        r.warn(f"[docs] adr_path '{cfg['docs']['adr_path']}' does not exist.")
+    else:
+        r.warn("No ADR folder found (e.g. docs/adr). Record architecture decisions in the repository, "
+               "or set [docs] adr_path in .wow.toml if they live somewhere else.")
     results.append(r)
     return results

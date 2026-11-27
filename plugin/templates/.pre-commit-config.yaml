@@ -2,7 +2,7 @@
 #   pip install pre-commit && pre-commit install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push
 repos:
   - repo: https://github.com/Accelerated-Innovation/way-of-work
-    rev: v0.1.0
+    rev: v0.1.1
     hooks:
       - id: wow-secrets         # blocks API keys / credentials / .env files in the commit
       - id: wow-commit-msg      # Conventional Commits, no vague summaries
