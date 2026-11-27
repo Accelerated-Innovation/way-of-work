@@ -1,0 +1,23 @@
+# Way of Work PR checks. Produces the required status checks "wow / standards" and
+# "wow / secrets". Keep @v0 and wow-ref in step.
+name: wow
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: wow-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  wow:
+    uses: Accelerated-Innovation/way-of-work/.github/workflows/pr-checks.yml@v0
+    with:
+      wow-ref: v0
+      # dependency-review: true   # needs the dependency graph (private repos: GitHub Code Security)
+    secrets: inherit

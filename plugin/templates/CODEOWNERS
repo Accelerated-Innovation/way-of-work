@@ -1,0 +1,10 @@
+# Way of Work §13.1: code owners for high-risk areas only, so they always get an
+# experienced reviewer without blocking everything else. Replace the team handles.
+/.github/workflows/           @Accelerated-Innovation/<repo-lead-team>
+/.wow.toml                    @Accelerated-Innovation/<repo-lead-team>
+/.gitleaksignore              @Accelerated-Innovation/<repo-lead-team>
+**/auth/                      @Accelerated-Innovation/<auth-owners>
+**/Migrations/                @Accelerated-Innovation/<data-owners>
+**/migrations/                @Accelerated-Innovation/<data-owners>
+**/contracts/                 @Accelerated-Innovation/<contract-owners>
+**/openapi*.json              @Accelerated-Innovation/<contract-owners>

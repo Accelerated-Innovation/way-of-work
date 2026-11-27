@@ -1,0 +1,38 @@
+# CI for the way-of-work repository itself: tests, self-scan, and dogfooding the
+# reusable PR checks against this repo's own pull requests.
+name: CI
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  test:
+    name: test (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: No secrets in this repository
+        run: python plugin/validators/wow.py secrets
+
+  wow:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/pr-checks.yml
+    with:
+      wow-ref: ${{ github.event.pull_request.head.sha }}

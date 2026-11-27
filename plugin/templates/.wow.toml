@@ -1,0 +1,27 @@
+# Way of Work settings for this repository. Every key is optional; defaults are in
+# way-of-work/plugin/validators/wow_validators/config.py.
+
+# Work item IDs: numeric (1234) or tracker keys (WOW-1234).
+# work_item_pattern = '(?:\d+|[A-Z][A-Z0-9]+-\d+)'
+# work_item_url = "https://<tracker>/browse/{id}"
+
+[version]
+# Single source of the version (§5): package.json | pyproject.toml | path/to/App.csproj |
+# Directory.Build.props | VERSION. Auto-detected at the repo root when omitted.
+# file = "package.json"
+
+[migrations]
+# Where migrations live; files that already exist on the base branch must not change.
+# paths = ["**/Migrations/**", "**/alembic/versions/**"]
+
+[config]
+# Setting-name parity across environments (§11). Names only, never values.
+# template = ".env.example"
+# environments = ["deploy/develop.env", "deploy/staging.env", "deploy/demo.env", "deploy/prod.env"]
+
+[manifests]
+# Kubernetes / Helm manifests to check for floating tags, probes and resources (§5, §6.2).
+# paths = ["deploy/**/*.yaml", "charts/**/templates/*.yaml"]
+
+[pr]
+# max_changed_lines = 400

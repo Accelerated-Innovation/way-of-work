@@ -1,0 +1,18 @@
+# Way of Work release: on every push to prod, tag vX.Y.Z, publish the GitHub release,
+# and after a hotfix open the back-merge PRs. Keep @v0 and wow-ref in step.
+name: wow-release
+
+on:
+  push:
+    branches: [prod]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    uses: Accelerated-Innovation/way-of-work/.github/workflows/release.yml@v0
+    with:
+      wow-ref: v0
+    secrets: inherit   # WOW_TOKEN (optional): lets back-merge PRs trigger their checks

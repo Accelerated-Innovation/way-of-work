@@ -1,0 +1,19 @@
+# Packages the validators so pre-commit (and `pip install`) can provide the `wow` command.
+# The plugin, the Claude hooks and CI run the same code directly via plugin/validators/wow.py.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wow-validators"
+version = "0.1.0"
+description = "Accelerated Innovation Way of Work validators"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+wow = "wow_validators.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["plugin/validators"]
+include = ["wow_validators*"]

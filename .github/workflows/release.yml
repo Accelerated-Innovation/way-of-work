@@ -1,0 +1,152 @@
+# Way of Work — reusable release workflow. Call it on every push to `prod`
+# (see templates/.github/workflows/wow-release.yml).
+#
+#   release   — tags vX.Y.Z from the component's single version source (§5) and publishes
+#               a GitHub release: the release notes from the promotion PR + a changelog
+#               generated from commits since the previous tag.
+#   backmerge — when the push came from a hotfix/* PR, opens PRs merging prod back into
+#               develop and into any environment branch that is ahead of prod (§2).
+name: Way of Work release
+
+on:
+  workflow_call:
+    inputs:
+      wow-ref:
+        type: string
+        default: v0
+      python-version:
+        type: string
+        default: "3.12"
+    secrets:
+      WOW_TOKEN:
+        description: >-
+          Optional token (GitHub App or fine-grained PAT) with contents + pull-requests write.
+          Needed for back-merge PRs to trigger their own checks: PRs opened with the default
+          GITHUB_TOKEN do not start workflows. Also used to read way-of-work if it is private.
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: wow-release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Check out Way of Work
+        uses: actions/checkout@v4
+        with:
+          repository: Accelerated-Innovation/way-of-work
+          ref: ${{ inputs.wow-ref }}
+          path: .wow
+          token: ${{ secrets.WOW_TOKEN || github.token }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Read version
+        id: version
+        run: echo "version=$(python .wow/plugin/validators/wow.py version --print)" >> "$GITHUB_OUTPUT"
+
+      - name: Tag and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            if [ "$(git rev-list -n1 "${TAG}")" = "${GITHUB_SHA}" ]; then
+              echo "${TAG} already points at this commit; nothing to do."
+              exit 0
+            fi
+            echo "::error title=Version not bumped::${TAG} already exists on another commit. Every production release needs a new version (§5)."
+            exit 1
+          fi
+
+          PREV="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+
+          # Release notes written in the promotion / hotfix PR (by /wow:release).
+          PR_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --jq '.[0] // empty' || true)"
+          {
+            if [ -n "${PR_JSON}" ]; then
+              echo "${PR_JSON}" | jq -r '"_Released via #\(.number) — \(.title)_\n\n" + (.body // "")'
+              echo
+            fi
+            if [ -n "${PREV}" ]; then
+              python .wow/plugin/validators/wow.py changelog --version "${VERSION}" --since "${PREV}"
+            else
+              python .wow/plugin/validators/wow.py changelog --version "${VERSION}"
+            fi
+            echo
+            echo "_Commit ${GITHUB_SHA}_"
+          } > release-notes.md
+
+          gh release create "${TAG}" --target "${GITHUB_SHA}" --title "${TAG}" --notes-file release-notes.md
+          echo "Released ${TAG}" >> "$GITHUB_STEP_SUMMARY"
+
+  backmerge:
+    name: backmerge
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Open back-merge PRs after a hotfix
+        env:
+          GH_TOKEN: ${{ secrets.WOW_TOKEN || github.token }}
+          VERSION: ${{ needs.release.outputs.version }}
+          PROD: ${{ github.ref_name }}
+          HAS_WOW_TOKEN: ${{ secrets.WOW_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          PR="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --jq '.[0] // {} | "\(.head.ref // "")\t\(.number // "")"' || true)"
+          HEAD_REF="${PR%%$'\t'*}"
+          PR_NUMBER="${PR##*$'\t'}"
+          PR_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}"
+          case "${HEAD_REF}" in
+            hotfix/*) echo "Hotfix ${HEAD_REF} reached ${PROD}; merging back." ;;
+            *) echo "Not a hotfix (${HEAD_REF:-direct push}); nothing to merge back."; exit 0 ;;
+          esac
+
+          for TARGET in develop staging demo; do
+            git ls-remote --exit-code --heads origin "${TARGET}" >/dev/null || continue
+            git fetch --quiet origin "${TARGET}"
+            if [ "${TARGET}" != "develop" ] && [ "$(git rev-list --count "origin/${PROD}..origin/${TARGET}")" = "0" ]; then
+              echo "${TARGET} is not ahead of ${PROD}; promotion will carry the fix."
+              continue
+            fi
+            if [ "$(git rev-list --count "origin/${TARGET}..origin/${PROD}")" = "0" ]; then
+              echo "${TARGET} already contains ${PROD}."
+              continue
+            fi
+            EXISTING="$(gh pr list --base "${TARGET}" --head "${PROD}" --state open --json number --jq '.[0].number // ""')"
+            if [ -n "${EXISTING}" ]; then
+              echo "Back-merge PR #${EXISTING} into ${TARGET} already open."
+              continue
+            fi
+            gh pr create --base "${TARGET}" --head "${PROD}" \
+              --title "chore(release): merge hotfix v${VERSION} back into ${TARGET}" \
+              --body "$(printf '## What changed and why\nHotfix v%s (%s) is live on %s. Way of Work §2: merge it back the same day.\n\n## Work item\nSame work item as the hotfix: %s\n\n## Screenshots\nN/A\n\n## Impact (database / configuration / infrastructure)\nAs in the hotfix PR.\n\n## How it was tested\nTested in the hotfix PR; this merge only brings it back.\n' "${VERSION}" "${HEAD_REF}" "${PROD}" "${PR_URL}")"
+          done
+          if [ "${HAS_WOW_TOKEN}" != "true" ]; then
+            echo "::warning::Back-merge PRs were opened with GITHUB_TOKEN, so their checks will not start on their own. Set the WOW_TOKEN secret, or close and reopen the PR."
+          fi

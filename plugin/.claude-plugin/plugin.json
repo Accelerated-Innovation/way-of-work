@@ -1,0 +1,9 @@
+{
+  "name": "wow",
+  "version": "0.1.0",
+  "description": "Accelerated Innovation Way of Work: branch, commit, PR, review and release the way the team agreed, with guardrails that keep secrets and API keys out of every repository.",
+  "author": { "name": "Accelerated Innovation" },
+  "homepage": "https://github.com/Accelerated-Innovation/way-of-work",
+  "repository": "https://github.com/Accelerated-Innovation/way-of-work",
+  "keywords": ["way-of-work", "git", "pull-requests", "release", "secrets", "standards"]
+}

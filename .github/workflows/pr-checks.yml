@@ -1,0 +1,148 @@
+# Way of Work — reusable pull request checks.
+#
+# Called from every repository with a few lines (see templates/.github/workflows/wow.yml).
+# Produces two required status checks:
+#   wow / standards  — branch, commits, PR description, promotion, migrations, size,
+#                      config parity, manifests, version, forbidden files
+#   wow / secrets    — gitleaks over the PR's commits (API keys are a hard block)
+# Stack-specific lint, type checks, tests and build stay in each repository's own CI.
+name: Way of Work PR checks
+
+on:
+  workflow_call:
+    inputs:
+      wow-ref:
+        description: "Ref of Accelerated-Innovation/way-of-work to run (keep equal to the @ref you call this workflow with)"
+        type: string
+        default: v0
+      python-version:
+        type: string
+        default: "3.12"
+      gitleaks-version:
+        type: string
+        default: "8.28.0"
+      dependency-review:
+        description: "Run GitHub dependency review (needs the dependency graph; private repos need GitHub Code Security)"
+        type: boolean
+        default: false
+      fail-on-severity:
+        type: string
+        default: high
+    secrets:
+      WOW_TOKEN:
+        description: "Optional token that can read Accelerated-Innovation/way-of-work when it is private"
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  standards:
+    name: standards
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check out Way of Work
+        uses: actions/checkout@v4
+        with:
+          repository: Accelerated-Innovation/way-of-work
+          ref: ${{ inputs.wow-ref }}
+          path: .wow
+          token: ${{ secrets.WOW_TOKEN || github.token }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Way of Work standards
+        # PR text is passed through env, never interpolated into the script.
+        env:
+          WOW_PR_TITLE: ${{ github.event.pull_request.title }}
+          WOW_PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git fetch --no-tags --quiet origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          python .wow/plugin/validators/wow.py ci \
+            --base "origin/${BASE_REF}" --head HEAD \
+            --base-branch "${BASE_REF}" --head-branch "${HEAD_REF}"
+
+  secrets:
+    name: secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check out Way of Work
+        uses: actions/checkout@v4
+        with:
+          repository: Accelerated-Innovation/way-of-work
+          ref: ${{ inputs.wow-ref }}
+          path: .wow
+          token: ${{ secrets.WOW_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Install gitleaks
+        env:
+          VERSION: ${{ inputs.gitleaks-version }}
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Scan the PR's commits
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch --no-tags --quiet origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          gitleaks git . \
+            --config .wow/config/gitleaks.toml \
+            --log-opts="origin/${BASE_REF}..HEAD" \
+            --redact --verbose --exit-code 1 \
+            --report-format sarif --report-path gitleaks.sarif
+
+      - name: Explain a failure
+        if: failure()
+        run: |
+          {
+            echo "## ❌ Secret detected"
+            echo
+            echo "A credential (for example an OpenAI, Anthropic or Azure OpenAI key) is in this PR's commits."
+            echo
+            echo "1. **Rotate the key now.** Once pushed it is compromised; removing it in a later commit does not help."
+            echo "2. Remove it from the branch history (rebase/amend), not just from the latest commit."
+            echo "3. Read it from the secret store / vault at runtime (Way of Work §6.2). Put a placeholder in .env.example."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+          retention-days: 7
+
+  dependencies:
+    name: dependencies
+    if: ${{ inputs.dependency-review }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: ${{ inputs.fail-on-severity }}

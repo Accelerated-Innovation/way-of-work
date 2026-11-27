@@ -1,0 +1,13 @@
+# Local checks for everyone, with or without Claude:
+#   pip install pre-commit && pre-commit install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push
+repos:
+  - repo: https://github.com/Accelerated-Innovation/way-of-work
+    rev: v0.1.0
+    hooks:
+      - id: wow-secrets         # blocks API keys / credentials / .env files in the commit
+      - id: wow-commit-msg      # Conventional Commits, no vague summaries
+      - id: wow-branch          # feature|fix|hotfix/<work-item>-<slug>, never commit on environment branches
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks

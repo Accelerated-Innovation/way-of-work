@@ -1,0 +1,56 @@
+# Accelerated Innovation — Way of Work secret scanning rules for gitleaks.
+# Used by .github/workflows/pr-checks.yml. Extends the built-in gitleaks rules
+# (which already cover OpenAI, Anthropic, AWS, GitHub, Slack, private keys, ...)
+# with stricter AI-provider rules. Keep in sync with
+# plugin/validators/wow_validators/checks/secrets.py.
+#
+# There is deliberately no global allowlist. A false positive is fixed by using a
+# placeholder value, not by teaching the scanner to ignore real-looking keys.
+
+title = "Accelerated Innovation Way of Work"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "wow-anthropic-api-key"
+description = "Anthropic API key"
+regex = '''sk-ant-(?:api|admin)\d{2}-[A-Za-z0-9_\-]{20,}|sk-ant-[A-Za-z0-9_\-]{32,}'''
+keywords = ["sk-ant-"]
+
+[[rules]]
+id = "wow-openai-api-key"
+description = "OpenAI API key (project, service account, admin or legacy)"
+regex = '''sk-(?:proj|svcacct|admin|None)-[A-Za-z0-9_\-]{20,}|sk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}'''
+keywords = ["sk-proj-", "sk-svcacct-", "sk-admin-", "sk-none-", "t3blbkfj"]
+
+[[rules]]
+id = "wow-azure-openai-key"
+description = "Azure OpenAI / Azure AI Services key assigned in code or config"
+regex = '''(?i)(?:azure|openai|cognitive|aoai|ai[_-]?services?)[\w.\-]{0,30}?(?:key|secret)["']?\s*[:=]\s*["']?([0-9a-f]{32}|[A-Za-z0-9]{84})\b'''
+secretGroup = 1
+keywords = ["azure", "openai", "cognitive", "aoai", "aiservice", "ai_service", "ai-service"]
+
+[[rules]]
+id = "wow-google-ai-key"
+description = "Google / Gemini API key"
+regex = '''\bAIza[0-9A-Za-z_\-]{35}\b'''
+keywords = ["aiza"]
+
+[[rules]]
+id = "wow-huggingface-token"
+description = "Hugging Face token"
+regex = '''\bhf_[A-Za-z0-9]{30,}\b'''
+keywords = ["hf_"]
+
+[[rules]]
+id = "wow-groq-key"
+description = "Groq API key"
+regex = '''\bgsk_[A-Za-z0-9]{40,}\b'''
+keywords = ["gsk_"]
+
+[[rules]]
+id = "wow-xai-key"
+description = "xAI API key"
+regex = '''\bxai-[A-Za-z0-9]{40,}\b'''
+keywords = ["xai-"]

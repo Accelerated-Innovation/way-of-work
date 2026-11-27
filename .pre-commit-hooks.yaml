@@ -1,0 +1,20 @@
+# Hooks other repositories can use through pre-commit (see plugin/templates/.pre-commit-config.yaml).
+- id: wow-secrets
+  name: Way of Work — no secrets or API keys
+  entry: wow secrets --staged
+  language: python
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit]
+- id: wow-commit-msg
+  name: Way of Work — commit message
+  entry: wow commit-msg
+  language: python
+  stages: [commit-msg]
+- id: wow-branch
+  name: Way of Work — branch name, no commits on environment branches
+  entry: wow branch --forbid-environment
+  language: python
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit, pre-push]

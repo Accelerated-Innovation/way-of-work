@@ -1,0 +1,27 @@
+# When a release tag vX.Y.Z is pushed, move the major tag (e.g. v0) to it, so repositories
+# calling `...pr-checks.yml@v0` pick up compatible updates automatically.
+name: Publish
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+
+jobs:
+  major-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check VERSION matches the tag
+        run: |
+          [ "v$(cat VERSION)" = "${GITHUB_REF_NAME}" ] || { echo "::error::VERSION ($(cat VERSION)) does not match ${GITHUB_REF_NAME}"; exit 1; }
+      - name: Move major tag
+        run: |
+          MAJOR="${GITHUB_REF_NAME%%.*}"
+          git tag -f "${MAJOR}" "${GITHUB_SHA}"
+          git push -f origin "refs/tags/${MAJOR}"
+          echo "${MAJOR} → ${GITHUB_REF_NAME}" >> "$GITHUB_STEP_SUMMARY"

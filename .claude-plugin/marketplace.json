@@ -1,0 +1,13 @@
+{
+  "name": "accelerated-innovation",
+  "owner": { "name": "Accelerated Innovation" },
+  "metadata": { "description": "Accelerated Innovation internal Claude plugins" },
+  "plugins": [
+    {
+      "name": "wow",
+      "source": "./plugin",
+      "description": "Way of Work: branch, commit, PR, review and release to the team standard, with secret guardrails.",
+      "version": "0.1.0"
+    }
+  ]
+}

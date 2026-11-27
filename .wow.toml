@@ -1,0 +1,3 @@
+# Way of Work settings for this repository (the standard's own repo).
+[version]
+file = "VERSION"
